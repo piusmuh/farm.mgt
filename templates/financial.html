@@ -1,0 +1,994 @@
+{% extends "base.html" %}
+
+{% block title %}Financial - Farm Management System{% endblock %}
+{% block page_title %}Financial Management{% endblock %}
+
+{% block content %}
+<div class="financial-container">
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-arrow-up"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="totalRevenue">UGX 0</h3>
+                    <p>Total Revenue</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-arrow-down"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="totalExpenses">UGX 0</h3>
+                    <p>Total Expenses</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="netProfit">UGX 0</h3>
+                    <p>Net Profit</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-calendar"></i>
+                </div>
+                <div class="stat-content">
+                    <h3 id="monthlyProfit">UGX 0</h3>
+                    <p>This Month</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Controls -->
+    <div class="filter-controls">
+        <div class="row w-100">
+            <div class="col-md-2">
+                <label for="farmFilter" class="form-label">Farm</label>
+                <select class="form-select" id="farmFilter">
+                    <option value="">All Farms</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="typeFilter" class="form-label">Transaction Type</label>
+                <select class="form-select" id="typeFilter">
+                    <option value="">All Types</option>
+                    <option value="revenue">Revenue</option>
+                    <option value="expense">Expense</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="categoryFilter" class="form-label">Category</label>
+                <select class="form-select" id="categoryFilter">
+                    <option value="">All Categories</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="dateFrom" class="form-label">From Date</label>
+                <input type="date" class="form-control" id="dateFrom">
+            </div>
+            <div class="col-md-2">
+                <label for="dateTo" class="form-label">To Date</label>
+                <input type="date" class="form-control" id="dateTo">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                {% if session.role in ['admin','manager'] %}
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
+                    <i class="fas fa-plus"></i> Add transaction
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Financial Trends Chart -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="chart-card">
+                <div class="chart-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-chart-line"></i> Financial Performance Trends</h5>
+                    <div class="chart-controls">
+                        <select class="form-select form-select-sm" id="financialChartPeriod">
+                            <option value="3">3 Months</option>
+                            <option value="6" selected>6 Months</option>
+                            <option value="12">12 Months</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="chart-body">
+                    <canvas id="financialChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Financial Records Table -->
+    <div class="table-container">
+        <div class="table-header">
+            <h5><i class="fas fa-money-bill-wave"></i> Financial Records</h5>
+            <span class="badge bg-primary" id="recordCount">0 records</span>
+        </div>
+        <div id="financialTable">
+            <div class="text-center p-4">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Transaction Modal -->
+<div class="modal fade" id="addTransactionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-plus"></i> Add New Transaction</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addTransactionForm">
+                <input type="hidden" id="editTransactionId" value="">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="farmSelect" class="form-label">Farm *</label>
+                                <select class="form-select" id="farmSelect" required>
+                                    <option value="">Select Farm</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="transactionType" class="form-label">Transaction Type *</label>
+                                <select class="form-select" id="transactionType" required>
+                                    <option value="">Select Type</option>
+                                    <option value="revenue">Revenue</option>
+                                    <option value="expense">Expense</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="category" class="form-label">Category *</label>
+                                <input type="text" class="form-control" id="category" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="amount" class="form-label">Amount *</label>
+                                <input type="number" class="form-control" id="amount" step="0.01" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="transactionDate" class="form-label">Transaction Date *</label>
+                                <input type="date" class="form-control" id="transactionDate" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="paymentMethod" class="form-label">Payment Method</label>
+                                <select class="form-select" id="paymentMethod">
+                                    <option value="cash">Cash</option>
+                                    <option value="check">Check</option>
+                                    <option value="card">Card</option>
+                                    <option value="bank_transfer">Bank Transfer</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="referenceNumber" class="form-label">Reference Number</label>
+                                <input type="text" class="form-control" id="referenceNumber">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Transaction
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Utility function to escape HTML to prevent XSS
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+let financialData = [];
+let farmsData = [];
+const userRole = "{{ session.role|default('') }}";
+
+// Enhanced currency formatting
+function formatCurrency(amount) {
+    if (amount === null || amount === undefined || isNaN(Number(amount))) return 'UGX 0';
+    return 'UGX ' + new Intl.NumberFormat('en-UG', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(Number(amount));
+}
+
+// Enhanced status badges
+function createStatusBadge(status) {
+    const statusMap = {
+        'revenue': { class: 'status-healthy', text: 'Revenue' },
+        'expense': { class: 'status-sick', text: 'Expense' },
+        'active': { class: 'status-active', text: 'Active' },
+        'inactive': { class: 'status-inactive', text: 'Inactive' }
+    };
+    
+    const statusInfo = statusMap[status] || { class: 'status-inactive', text: status };
+    return `<span class="status-badge ${statusInfo.class}">${statusInfo.text}</span>`;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Financial page loaded');
+    loadFarms();
+    loadFinancialRecords();
+    loadFinancialChart();
+    setupEventListeners();
+    
+    // Set default dates
+    const today = new Date().toISOString().split('T')[0];
+    const firstDay = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    document.getElementById('dateFrom').value = firstDay;
+    document.getElementById('dateTo').value = today;
+});
+
+function setupEventListeners() {
+    // Add/edit transaction form submission
+    document.getElementById('addTransactionForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveTransaction();
+    });
+    
+    // Filter controls
+    document.getElementById('farmFilter').addEventListener('change', loadFinancialRecords);
+    document.getElementById('typeFilter').addEventListener('change', loadFinancialRecords);
+    document.getElementById('categoryFilter').addEventListener('change', loadFinancialRecords);
+    document.getElementById('dateFrom').addEventListener('change', loadFinancialRecords);
+    document.getElementById('dateTo').addEventListener('change', loadFinancialRecords);
+    
+    // Financial chart period selector
+    const chartPeriodSelector = document.getElementById('financialChartPeriod');
+    if (chartPeriodSelector) {
+        chartPeriodSelector.addEventListener('change', function() {
+            loadFinancialChart(this.value);
+        });
+    }
+}
+
+function loadFarms() {
+    console.log('Loading farms for filter...');
+    fetch('/api/farms')
+        .then(response => {
+            if (!response.ok) throw new Error('Failed to load farms: ' + response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Farms loaded for filter:', data);
+            farmsData = data;
+            populateFarmSelects();
+        })
+        .catch(error => {
+            console.error('Error loading farms:', error);
+            showError(document.getElementById('financialTable'), 'Failed to load farms data: ' + error.message);
+        });
+}
+
+function populateFarmSelects() {
+    const farmFilter = document.getElementById('farmFilter');
+    const farmSelect = document.getElementById('farmSelect');
+    
+    if (!farmFilter || !farmSelect) {
+        console.error('Farm filter or select elements not found');
+        return;
+    }
+    
+    farmFilter.innerHTML = '<option value="">All Farms</option>';
+    farmSelect.innerHTML = '<option value="">Select Farm</option>';
+    
+    console.log('Populating farm selects with data:', farmsData);
+    
+    farmsData.forEach(farm => {
+        const option1 = document.createElement('option');
+        option1.value = farm.id;
+        option1.textContent = farm.name;
+        option1.setAttribute('data-farm-id', farm.id);
+        farmFilter.appendChild(option1);
+        
+        const option2 = document.createElement('option');
+        option2.value = farm.id;
+        option2.textContent = farm.name;
+        option2.setAttribute('data-farm-id', farm.id);
+        farmSelect.appendChild(option2);
+    });
+    
+    console.log('Farm filter options count:', farmFilter.children.length);
+}
+function loadFinancialRecords() {
+    console.log('Loading financial records...');
+    showLoading(document.getElementById('financialTable'));
+    
+    const filters = applyFilters();
+    const url = buildFilterUrl('/api/financial', filters);
+    
+    console.log('Fetching financial records from URL:', url);
+    
+    fetch(url)
+        .then(response => {
+            console.log('Response status:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Financial data loaded, records found:', data.length);
+            console.log('Sample record:', data[0]);
+            financialData = data;
+            displayFinancialRecords(data);
+            updateRecordCount(data.length);
+            populateCategories();
+            loadFinancialSummary();
+        })
+        .catch(error => {
+            console.error('Error loading financial records:', error);
+            showError(document.getElementById('financialTable'), `Failed to load financial records. Error: ${error.message}`);
+        });
+}
+function populateCategories() {
+    const categoryFilter = document.getElementById('categoryFilter');
+    if (!categoryFilter) return;
+    
+    categoryFilter.innerHTML = '<option value="">All Categories</option>';
+    const uniqueCategories = [...new Set(financialData.map(record => record.category || ''))].filter(Boolean);
+    
+    uniqueCategories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category;
+        categoryFilter.appendChild(option);
+    });
+}
+
+function displayFinancialRecords(records) {
+    console.log('Displaying records:', records);
+    const container = document.getElementById('financialTable');
+    
+    if (records.length === 0) {
+        container.innerHTML = '<div class="text-center p-4"><p>No financial records found</p></div>';
+        return;
+    }
+
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-striped table-hover table-sm">
+                <thead>
+                    <tr>
+                        <th width="10%">Date</th>
+                        <th width="10%">Type</th>
+                        <th width="12%">Category</th>
+                        <th width="15%">Description</th>
+                        <th width="12%">Farm</th>
+                        <th width="12%">Amount</th>
+                        <th width="10%">Payment Method</th>
+                        <th width="10%">Reference</th>
+                        <th width="9%">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    records.forEach(record => {
+        const typeMap = {
+            'revenue': { class: 'bg-success', text: 'Revenue', icon: 'fa-arrow-up' },
+            'expense': { class: 'bg-danger', text: 'Expense', icon: 'fa-arrow-down' }
+        };
+        const type = typeMap[record.transaction_type] || { class: 'bg-secondary', text: record.transaction_type, icon: 'fa-question' };
+
+        const formattedAmount = formatCurrency(record.amount);
+        const amountDisplay = record.transaction_type === 'revenue' ? 
+            `<span class="text-success fw-bold">+${formattedAmount}</span>` : 
+            `<span class="text-danger fw-bold">-${formattedAmount}</span>`;
+
+        html += `
+            <tr>
+                <td><small>${record.transaction_date ? formatDateShort(record.transaction_date) : 'N/A'}</small></td>
+                <td>
+                    <span class="badge ${type.class}">
+                        <i class="fas ${type.icon} me-1"></i>${type.text}
+                    </span>
+                </td>
+                <td><small>${escapeHtml(record.category || '-')}</small></td>
+                <td><small>${escapeHtml(record.description || '-')}</small></td>
+                <td><small>${escapeHtml(record.farm_name || 'N/A')}</small></td>
+                <td><small>${amountDisplay}</small></td>
+                <td><small>${record.payment_method ? record.payment_method.replace('_', ' ').toUpperCase() : 'N/A'}</small></td>
+                <td><small>${escapeHtml(record.reference_number || '-')}</small></td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary" onclick="viewTransaction(${record.id})" title="View">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        ${['admin','manager'].includes(userRole) ? `
+                        <button class="btn btn-outline-success" onclick="editTransaction(${record.id})" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" title="More">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteTransaction(${record.id})">Delete</a></li>
+                        </ul>
+                        ` : ''}
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+function updateRecordCount(count) {
+    const recordCountElement = document.getElementById('recordCount');
+    if (recordCountElement) {
+        recordCountElement.textContent = `${count} records`;
+    }
+}
+
+function loadFinancialSummary() {
+    console.log('Loading financial summary...');
+    
+    // First try server endpoint
+    fetch('/api/financial/summary')
+        .then(response => {
+            if (!response.ok) throw new Error('No server summary available');
+            return response.json();
+        })
+        .then(summary => {
+            console.log('Server summary:', summary);
+            document.getElementById('totalRevenue').textContent = formatCurrency(summary.total_revenue || 0);
+            document.getElementById('totalExpenses').textContent = formatCurrency(summary.total_expenses || 0);
+            document.getElementById('netProfit').textContent = formatCurrency(summary.net_profit || 0);
+            document.getElementById('monthlyProfit').textContent = formatCurrency(summary.this_month_revenue || 0);
+        })
+        .catch(error => {
+            console.log('Using client-side calculation:', error.message);
+            // Fallback: compute from loaded financialData
+            const totalRevenue = financialData
+                .filter(r => r.transaction_type === 'revenue')
+                .reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+            const totalExpenses = financialData
+                .filter(r => r.transaction_type === 'expense')
+                .reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+            const netProfit = totalRevenue - totalExpenses;
+            
+            const now = new Date();
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+            const monthlyRevenue = financialData
+                .filter(r => {
+                    if (!r.transaction_date) return false;
+                    const d = new Date(r.transaction_date);
+                    return r.transaction_type === 'revenue' && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+                })
+                .reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+            
+            document.getElementById('totalRevenue').textContent = formatCurrency(totalRevenue);
+            document.getElementById('totalExpenses').textContent = formatCurrency(totalExpenses);
+            document.getElementById('netProfit').textContent = formatCurrency(netProfit);
+            document.getElementById('monthlyProfit').textContent = formatCurrency(monthlyRevenue);
+        });
+}
+
+function saveTransaction() {
+    const editId = document.getElementById('editTransactionId').value;
+    const payload = {
+        farm_id: parseInt(document.getElementById('farmSelect').value) || null,
+        transaction_type: document.getElementById('transactionType').value,
+        category: document.getElementById('category').value,
+        amount: parseFloat(document.getElementById('amount').value),
+        transaction_date: document.getElementById('transactionDate').value,
+        payment_method: document.getElementById('paymentMethod').value,
+        reference_number: document.getElementById('referenceNumber').value,
+        description: document.getElementById('description').value
+    };
+
+    const url = editId ? `/api/financial/${editId}` : '/api/financial';
+    const method = editId ? 'PUT' : 'POST';
+
+    console.log('Saving transaction:', payload);
+
+    fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => {
+        if (!r.ok) throw new Error('HTTP error ' + r.status);
+        return r.json();
+    })
+    .then(data => {
+        if (data.error) throw new Error(data.error);
+        showSuccess(editId ? 'Transaction updated successfully' : 'Transaction added successfully');
+        hideModal('addTransactionModal');
+        document.getElementById('addTransactionForm').reset();
+        document.getElementById('editTransactionId').value = '';
+        loadFinancialRecords();
+    })
+    .catch(err => {
+        console.error('Error saving transaction:', err);
+        showError(document.body, 'Failed to save transaction: ' + err.message);
+    });
+}
+
+function viewTransaction(id) {
+    const transaction = financialData.find(t => t.id === id);
+    if (transaction) {
+        alert(`Transaction Details:\n\nType: ${transaction.transaction_type}\nCategory: ${transaction.category}\nAmount: ${formatCurrency(transaction.amount)}\nDate: ${formatDate(transaction.transaction_date)}\nFarm: ${transaction.farm_name}\nDescription: ${transaction.description || 'N/A'}`);
+    }
+}
+
+function editTransaction(id) {
+    const tx = financialData.find(t => t.id === id);
+    if (!tx) {
+        fetch(`/api/financial/${id}`)
+            .then(r => r.json())
+            .then(data => openTransactionModalForEdit(data))
+            .catch(err => {
+                console.error('Failed to fetch transaction for edit:', err);
+                showError(document.body, 'Failed to load transaction details');
+            });
+        return;
+    }
+    openTransactionModalForEdit(tx);
+}
+
+function openTransactionModalForEdit(tx) {
+    document.getElementById('editTransactionId').value = tx.id;
+    document.getElementById('farmSelect').value = tx.farm_id || '';
+    document.getElementById('transactionType').value = tx.transaction_type || '';
+    document.getElementById('category').value = tx.category || '';
+    document.getElementById('amount').value = tx.amount || '';
+    document.getElementById('transactionDate').value = tx.transaction_date || '';
+    document.getElementById('paymentMethod').value = tx.payment_method || 'cash';
+    document.getElementById('referenceNumber').value = tx.reference_number || '';
+    document.getElementById('description').value = tx.description || '';
+    showModal('addTransactionModal');
+}
+
+function applyFilters() {
+    const filters = {};
+    
+    const farmFilter = document.getElementById('farmFilter').value;
+    const typeFilter = document.getElementById('typeFilter').value;
+    const categoryFilter = document.getElementById('categoryFilter').value;
+    const dateFrom = document.getElementById('dateFrom').value;
+    const dateTo = document.getElementById('dateTo').value;
+    
+    // Debug farm filter value
+    console.log('Farm filter selected value:', farmFilter);
+    
+    if (farmFilter && farmFilter !== '') {
+        filters.farm_id = farmFilter;
+        console.log('Filtering by farm ID:', farmFilter);
+    }
+    if (typeFilter && typeFilter !== '') {
+        filters.transaction_type = typeFilter;
+    }
+    if (categoryFilter && categoryFilter !== '') {
+        filters.category = categoryFilter;
+    }
+    if (dateFrom) {
+        filters.date_from = dateFrom;
+    }
+    if (dateTo) {
+        filters.date_to = dateTo;
+    }
+    
+    console.log('Applied filters:', filters);
+    return filters;
+}
+
+function buildFilterUrl(baseUrl, filters) {
+    const params = new URLSearchParams();
+    Object.keys(filters).forEach(key => {
+        if (filters[key] && filters[key] !== '') {
+            params.append(key, filters[key]);
+        }
+    });
+    
+    const url = baseUrl + (params.toString() ? '?' + params.toString() : '');
+    console.log('Built URL for API call:', url);
+    return url;
+}
+
+function loadFinancialRecords() {
+    console.log('Loading financial records...');
+    showLoading(document.getElementById('financialTable'));
+    
+    const filters = applyFilters();
+    const url = buildFilterUrl('/api/financial', filters);
+    
+    console.log('Fetching financial records from URL:', url);
+    
+    fetch(url)
+        .then(response => {
+            console.log('Response status:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Financial data loaded, records found:', data.length);
+            if (data.length > 0) {
+                console.log('Sample record:', data[0]);
+            }
+            financialData = data;
+            displayFinancialRecords(data);
+            updateRecordCount(data.length);
+            populateCategories();
+            loadFinancialSummary();
+        })
+        .catch(error => {
+            console.error('Error loading financial records:', error);
+            showError(document.getElementById('financialTable'), `Failed to load financial records. Error: ${error.message}`);
+        });
+}
+
+function deleteTransaction(id) {
+    deleteItem('/api/financial', id, 'transaction');
+}
+
+// Financial Chart Functions
+let financialChartInstance = null;
+
+function loadFinancialChart(period = 6) {
+    console.log('Loading financial chart with period:', period);
+    
+    fetch(`/api/charts/revenue-expense?period=${period}`)
+        .then(response => {
+            if (!response.ok) throw new Error('HTTP error! status: ${response.status}');
+            return response.json();
+        })
+        .then(data => {
+            console.log('Financial chart data:', data);
+            createFinancialChart(data);
+        })
+        .catch(error => {
+            console.error('Error loading financial chart:', error);
+        });
+}
+
+function createFinancialChart(data) {
+    const ctx = document.getElementById('financialChart');
+    if (!ctx) return;
+    
+    // Destroy existing chart
+    if (financialChartInstance) {
+        financialChartInstance.destroy();
+    }
+    
+    const months = data.months || [];
+    const revenue = data.revenue || [];
+    const expenses = data.expenses || [];
+    
+    // Format month labels
+    const monthLabels = months.map(m => {
+        const [y, mo] = m.split('-');
+        const d = new Date(parseInt(y), parseInt(mo) - 1, 1);
+        return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    });
+    
+    // Calculate totals for legend
+    const totalRevenue = revenue.reduce((a, b) => a + (Number(b) || 0), 0);
+    const totalExpenses = expenses.reduce((a, b) => a + (Number(b) || 0), 0);
+    const totalPeriod = totalRevenue + totalExpenses;
+    
+    financialChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: monthLabels,
+            datasets: [
+                {
+                    label: 'Revenue',
+                    data: revenue,
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'Expenses',
+                    data: expenses,
+                    borderColor: 'rgb(255, 99, 132)',
+                    backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return formatCurrency(value);
+                        }
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const value = context.parsed.y;
+                            const label = context.dataset.label;
+                            return `${label}: ${formatCurrency(value)}`;
+                        },
+                        afterBody: function(context) {
+                            const data = context[0];
+                            const revenue = data.chart.data.datasets[0].data[data.dataIndex];
+                            const expenses = data.chart.data.datasets[1].data[data.dataIndex];
+                            const profit = revenue - expenses;
+                            const profitMargin = revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : '0.0';
+                            return `\nProfit: ${formatCurrency(profit)} (${profitMargin}% margin)`;
+                        }
+                    }
+                },
+                legend: {
+                    labels: {
+                        generateLabels: function(chart) {
+                            const data = chart.data;
+                            
+                            return data.datasets.map((dataset, i) => {
+                                const value = dataset.data.reduce((a, b) => a + (Number(b) || 0), 0);
+                                const pct = totalPeriod > 0 ? ((value / totalPeriod) * 100).toFixed(1) : '0.0';
+                                return {
+                                    text: `${dataset.label} (${pct}% of total)`,
+                                    fillStyle: dataset.backgroundColor,
+                                    hidden: false,
+                                    lineCap: dataset.borderCapStyle,
+                                    lineDash: dataset.borderDash,
+                                    lineDashOffset: dataset.borderDashOffset,
+                                    lineJoin: dataset.borderJoinStyle,
+                                    lineWidth: dataset.borderWidth,
+                                    strokeStyle: dataset.borderColor,
+                                    pointStyle: dataset.pointStyle,
+                                };
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+</script>
+
+<style>
+.chart-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transition: box-shadow 0.3s ease;
+}
+
+.chart-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.chart-header {
+    padding: 1.25rem;
+    border-bottom: 1px solid #e9ecef;
+    background: #fafafa;
+    border-radius: 12px 12px 0 0;
+}
+
+.chart-header h5 {
+    margin: 0;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.chart-header i {
+    margin-right: 0.5rem;
+    color: #3498db;
+}
+
+.chart-body {
+    padding: 1.5rem;
+    min-height: 300px;
+    position: relative;
+}
+
+.chart-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.chart-controls .form-select {
+    width: auto;
+    min-width: 120px;
+}
+</style>
+
+// Financial Chart Functions
+let financialChartInstance = null;
+
+function loadFinancialChart(period = 6) {
+    console.log('Loading financial chart with period:', period);
+    
+    fetch(`/api/charts/revenue-expense?period=${period}`)
+        .then(response => {
+            if (!response.ok) throw new Error('HTTP error! status: ${response.status}');
+            return response.json();
+        })
+        .then(data => {
+            console.log('Financial chart data:', data);
+            createFinancialChart(data);
+        })
+        .catch(error => {
+            console.error('Error loading financial chart:', error);
+        });
+}
+
+function createFinancialChart(data) {
+    const ctx = document.getElementById('financialChart');
+    if (!ctx) return;
+    
+    // Destroy existing chart
+    if (financialChartInstance) {
+        financialChartInstance.destroy();
+    }
+    
+    const months = data.months || [];
+    const revenue = data.revenue || [];
+    const expenses = data.expenses || [];
+    
+    // Format month labels
+    const monthLabels = months.map(m => {
+        const [y, mo] = m.split('-');
+        const d = new Date(parseInt(y), parseInt(mo) - 1, 1);
+        return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    });
+    
+    // Calculate totals for legend
+    const totalRevenue = revenue.reduce((a, b) => a + (Number(b) || 0), 0);
+    const totalExpenses = expenses.reduce((a, b) => a + (Number(b) || 0), 0);
+    const totalPeriod = totalRevenue + totalExpenses;
+    
+    financialChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: monthLabels,
+            datasets: [
+                {
+                    label: 'Revenue',
+                    data: revenue,
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'Expenses',
+                    data: expenses,
+                    borderColor: 'rgb(255, 99, 132)',
+                    backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return formatCurrency(value);
+                        }
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const value = context.parsed.y;
+                            const label = context.dataset.label;
+                            return `${label}: ${formatCurrency(value)}`;
+                        },
+                        afterBody: function(context) {
+                            const data = context[0];
+                            const revenue = data.chart.data.datasets[0].data[data.dataIndex];
+                            const expenses = data.chart.data.datasets[1].data[data.dataIndex];
+                            const profit = revenue - expenses;
+                            const profitMargin = revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : '0.0';
+                            return `\nProfit: ${formatCurrency(profit)} (${profitMargin}% margin)`;
+                        }
+                    }
+                },
+                legend: {
+                    labels: {
+                        generateLabels: function(chart) {
+                            const data = chart.data;
+                            
+                            return data.datasets.map((dataset, i) => {
+                                const value = dataset.data.reduce((a, b) => a + (Number(b) || 0), 0);
+                                const pct = totalPeriod > 0 ? ((value / totalPeriod) * 100).toFixed(1) : '0.0';
+                                return {
+                                    text: `${dataset.label} (${pct}% of total)`,
+                                    fillStyle: dataset.backgroundColor,
+                                    hidden: false,
+                                    lineCap: dataset.borderCapStyle,
+                                    lineDash: dataset.borderDash,
+                                    lineDashOffset: dataset.borderDashOffset,
+                                    lineJoin: dataset.borderJoinStyle,
+                                    lineWidth: dataset.borderWidth,
+                                    strokeStyle: dataset.borderColor,
+                                    pointStyle: dataset.pointStyle,
+                                };
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

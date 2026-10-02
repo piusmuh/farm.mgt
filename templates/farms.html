@@ -1,0 +1,513 @@
+{% extends "base.html" %}
+
+{% block title %}Farms - Farm Management System{% endblock %}
+{% block page_title %}Farm Management{% endblock %}
+
+{% block content %}
+<div class="farms-container">
+    <!-- Filter Controls -->
+    <div class="filter-controls">
+        <div class="row w-100">
+            <div class="col-md-3">
+                <label for="statusFilter" class="form-label">Status</label>
+                <select class="form-select" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="sold">Sold</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="searchInput" class="form-label">Search</label>
+                <input type="text" class="form-control" id="searchInput" placeholder="Search farms...">
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                {% if session.role in ['admin','manager'] %}
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFarmModal">
+                    <i class="fas fa-plus"></i> Add Farm
+                </button>
+                {% endif %}
+
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button class="btn btn-success" onclick="exportFarms()">
+                    <i class="fas fa-download"></i> Export
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Farms Table -->
+    <div class="table-container">
+        <div class="table-header">
+            <h5><i class="fas fa-home"></i> Farms</h5>
+            <span class="badge bg-primary" id="farmCount">0 farms</span>
+        </div>
+        <div id="farmsTable">
+            <div class="text-center p-4">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- Add Farm Modal -->
+<div class="modal fade" id="addFarmModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-plus"></i> Add New Farm</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addFarmForm">
+                <input type="hidden" id="editFarmId" value="">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="farmName" class="form-label">Farm Name *</label>
+                                <input type="text" class="form-control" id="farmName" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="ownerName" class="form-label">Owner Name *</label>
+                                <input type="text" class="form-control" id="ownerName" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="location" class="form-label">Location *</label>
+                                <input type="text" class="form-control" id="location" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="sizeAcres" class="form-label">Size (Acres) *</label>
+                                <input type="number" class="form-control" id="sizeAcres" step="0.01" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="establishedDate" class="form-label">Established Date</label>
+                                <input type="date" class="form-control" id="establishedDate">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="status" class="form-label">Status</label>
+                                <select class="form-select" id="status">
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                    <option value="sold">Sold</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="resetForm()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Farm
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Utility function to escape HTML to prevent XSS
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+let farmsData = [];
+const userRole = "{{ session.role|default('') }}";
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadFarms();
+    setupEventListeners();
+});
+
+function setupEventListeners() {
+    // Add farm form submission (used for add & edit)
+    document.getElementById('addFarmForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveFarm();
+    });
+    
+    // Filter controls
+    document.getElementById('statusFilter').addEventListener('change', filterFarms);
+    document.getElementById('searchInput').addEventListener('input', filterFarms);
+}
+
+function loadFarms() {
+    showLoading(document.getElementById('farmsTable'));
+    
+    fetch('/api/farms')
+        .then(response => {
+            if (!response.ok) throw new Error('HTTP error ' + response.status);
+            return response.json();
+        })
+        .then(data => {
+            farmsData = data;
+            displayFarms(data);
+            updateFarmCount(data.length);
+        })
+        .catch(error => {
+            console.error('Error loading farms:', error);
+            showError(document.getElementById('farmsTable'), 'Failed to load farms data. Please check if the server is running.');
+        });
+}
+
+function displayFarms(farms) {
+    const container = document.getElementById('farmsTable');
+    
+    if (farms.length === 0) {
+        container.innerHTML = '<div class="text-center p-4"><p>No farms found</p></div>';
+        return;
+    }
+
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-striped table-hover table-sm">
+                <thead>
+                    <tr>
+                        <th width="20%">Farm Name</th>
+                        <th width="15%">Owner</th>
+                        <th width="20%">Location</th>
+                        <th width="12%">Size (Acres)</th>
+                        <th width="13%">Status</th>
+                        <th width="12%">Established</th>
+                        <th width="8%">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    farms.forEach(farm => {
+        const statusMap = {
+            'active': { class: 'bg-success', text: 'Active', icon: 'fa-check-circle' },
+            'inactive': { class: 'bg-secondary', text: 'Inactive', icon: 'fa-times-circle' },
+            'sold': { class: 'bg-warning', text: 'Sold', icon: 'fa-exchange-alt' }
+        };
+        const status = statusMap[farm.status] || { class: 'bg-secondary', text: farm.status, icon: 'fa-question' };
+
+        html += `
+            <tr>
+                <td><strong>${escapeHtml(farm.name || 'N/A')}</strong></td>
+                <td><small>${escapeHtml(farm.owner_name || 'N/A')}</small></td>
+                <td><small>${escapeHtml(farm.location || 'N/A')}</small></td>
+                <td><span class="badge bg-light text-dark">${formatNumber(farm.size_acres, 2)} ac</span></td>
+                <td>
+                    <span class="badge ${status.class}">
+                        <i class="fas ${status.icon} me-1"></i>${status.text}
+                    </span>
+                </td>
+                <td><small>${farm.established_date ? formatDateShort(farm.established_date) : '-'}</small></td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary" onclick="viewFarm(${farm.id})" title="View">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        ${['admin','manager'].includes(userRole) ? `
+                        <button class="btn btn-outline-success" onclick="editFarm(${farm.id})" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" title="More">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="updateFarmStatus(${farm.id}, 'active')">Mark Active</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="updateFarmStatus(${farm.id}, 'inactive')">Mark Inactive</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="updateFarmStatus(${farm.id}, 'sold')">Mark Sold</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteFarm(${farm.id})">Delete</a></li>
+                        </ul>
+                        ` : ''}
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+function filterFarms() {
+    const statusFilter = document.getElementById('statusFilter').value;
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    
+    let filteredFarms = farmsData;
+    
+    if (statusFilter) {
+        filteredFarms = filteredFarms.filter(farm => farm.status === statusFilter);
+    }
+    
+    if (searchTerm) {
+        filteredFarms = filteredFarms.filter(farm => 
+            (farm.name || '').toLowerCase().includes(searchTerm) ||
+            (farm.owner_name || '').toLowerCase().includes(searchTerm) ||
+            (farm.location || '').toLowerCase().includes(searchTerm)
+        );
+    }
+    
+    displayFarms(filteredFarms);
+    updateFarmCount(filteredFarms.length);
+}
+
+function updateFarmCount(count) {
+    document.getElementById('farmCount').textContent = `${count} farms`;
+}
+
+// Save farm (add or edit)
+// Save farm (add or edit) - FIXED VERSION
+function saveFarm() {
+    const editId = document.getElementById('editFarmId').value;
+    const payload = {
+        name: document.getElementById('farmName').value,
+        owner_name: document.getElementById('ownerName').value,
+        location: document.getElementById('location').value,
+        size_acres: parseFloat(document.getElementById('sizeAcres').value),
+        established_date: document.getElementById('establishedDate').value || null,
+        status: document.getElementById('status').value, // ADD THIS LINE
+        description: document.getElementById('description').value
+    };
+
+    // Validate required fields
+    if (!payload.name || !payload.owner_name || !payload.location || !payload.size_acres) {
+        showError(document.body, 'Please fill in all required fields');
+        return;
+    }
+
+    const url = editId ? `/api/farms/${editId}` : '/api/farms';
+    const method = editId ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => { throw new Error(data.error || 'Save failed'); });
+        }
+        return response.json();
+    })
+    .then(data => {
+        showSuccess(editId ? 'Farm updated successfully' : 'Farm added successfully');
+        hideModal('addFarmModal');
+        document.getElementById('addFarmForm').reset();
+        document.getElementById('editFarmId').value = '';
+        loadFarms();
+    })
+    .catch(err => {
+        console.error('Error saving farm:', err);
+        showError(document.body, 'Failed to save farm: ' + err.message);
+    });
+}
+
+function viewFarm(id) {
+    const farm = farmsData.find(f => f.id === id);
+    if (farm) {
+        alert(`Farm: ${farm.name}\nOwner: ${farm.owner_name}\nLocation: ${farm.location}\nSize: ${farm.size_acres} acres\nStatus: ${farm.status}`);
+    }
+}
+
+function editFarm(id) {
+    const farm = farmsData.find(f => f.id === id);
+    if (!farm) {
+        fetch(`/api/farms/${id}`)
+            .then(r => r.json())
+            .then(farmData => openFarmModalForEdit(farmData))
+            .catch(err => console.error('Failed to fetch farm for edit:', err));
+        return;
+    }
+    openFarmModalForEdit(farm);
+}
+
+function openFarmModalForEdit(farm) {
+    document.getElementById('editFarmId').value = farm.id;
+    document.getElementById('farmName').value = farm.name || '';
+    document.getElementById('ownerName').value = farm.owner_name || '';
+    document.getElementById('location').value = farm.location || '';
+    document.getElementById('sizeAcres').value = farm.size_acres || '';
+    document.getElementById('establishedDate').value = farm.established_date || '';
+    document.getElementById('status').value = farm.status || 'active';
+    document.getElementById('description').value = farm.description || '';
+    showModal('addFarmModal');
+}
+
+function updateFarmStatus(id, newStatus) {
+    const farm = farmsData.find(f => f.id === id);
+    if (!farm) {
+        showError(document.body, 'Farm not found');
+        return;
+    }
+
+    const payload = {
+        name: farm.name,
+        owner_name: farm.owner_name,
+        location: farm.location,
+        size_acres: farm.size_acres,
+        established_date: farm.established_date || null,
+        status: newStatus,
+        description: farm.description || ''
+    };
+
+    fetch(`/api/farms/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => { throw new Error(data.error || 'Update failed'); });
+        }
+        return response.json();
+    })
+    .then(data => {
+        showSuccess(`Farm marked as ${newStatus} successfully`);
+        loadFarms();
+    })
+    .catch(error => {
+        console.error('Error updating farm status:', error);
+        showError(document.body, 'Failed to update farm status: ' + error.message);
+    });
+}
+
+function exportFarms() {
+    if (farmsData.length === 0) {
+        showError(document.body, 'No farms to export');
+        return;
+    }
+    
+    exportToCSV(farmsData, 'farms_export.csv');
+}
+
+// Add delete function for farms
+// Proper delete function for farms
+function deleteFarm(id) {
+    if (!confirm('Are you sure you want to delete this farm? This action cannot be undone.')) {
+        return;
+    }
+
+    fetch(`/api/farms/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => { throw new Error(data.error || 'Delete failed'); });
+        }
+        return response.json();
+    })
+    .then(data => {
+        showSuccess('Farm deleted successfully');
+        loadFarms(); // Refresh the list
+    })
+    .catch(error => {
+        console.error('Error deleting farm:', error);
+        showError(document.body, 'Failed to delete farm: ' + error.message);
+    });
+}
+
+// Add farm statistics to the modal
+function showFarmStats(farmId) {
+    fetch(`/api/farms/${farmId}/stats`)
+        .then(response => response.json())
+        .then(stats => {
+            const modalBody = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="stat-card-sm">
+                            <i class="fas fa-leaf"></i>
+                            <div>
+                                <h6>${stats.total_crops}</h6>
+                                <small>Total Crops</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="stat-card-sm">
+                            <i class="fas fa-paw"></i>
+                            <div>
+                                <h6>${stats.total_livestock}</h6>
+                                <small>Total Livestock</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <div class="stat-card-sm">
+                            <i class="fas fa-tasks"></i>
+                            <div>
+                                <h6>${stats.active_tasks}</h6>
+                                <small>Active Tasks</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="stat-card-sm">
+                            <i class="fas fa-users"></i>
+                            <div>
+                                <h6>${stats.total_workers}</h6>
+                                <small>Workers</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Show in a modal or alert
+            alert(`Farm Statistics:\nCrops: ${stats.total_crops}\nLivestock: ${stats.total_livestock}\nTasks: ${stats.active_tasks}\nWorkers: ${stats.total_workers}`);
+        })
+        .catch(error => {
+            console.error('Error loading farm stats:', error);
+        });
+}
+
+function updateFarmStats(farmsData) {
+    const activeFarms = farmsData.filter(farm => farm.status === 'active').length;
+    document.getElementById('activeFarmsCount').textContent = activeFarms;
+    
+    // These would need to be fetched from your API
+    // For now, we'll set placeholders
+    document.getElementById('totalCropsCount').textContent = '-';
+    document.getElementById('totalLivestockCount').textContent = '-';
+    document.getElementById('totalWorkersCount').textContent = '-';
+}
+
+function resetForm() {
+    document.getElementById('addFarmForm').reset();
+    document.getElementById('editFarmId').value = '';
+}
+</script>
+{% endblock %}

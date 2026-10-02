@@ -1,0 +1,471 @@
+{% extends "base.html" %}
+
+{% block title %}Labour - Farm Management System{% endblock %}
+{% block page_title %}Labour Management{% endblock %}
+
+{% block content %}
+<div class="crops-container"> <!-- reuse same container classes for identical style -->
+  <div class="filter-controls">
+    <div class="row w-100">
+      <div class="col-md-2">
+        <label for="farmFilter" class="form-label">Farm</label>
+        <select class="form-select" id="farmFilter">
+          <option value="">All Farms</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label for="roleFilter" class="form-label">Role</label>
+        <select class="form-select" id="roleFilter">
+          <option value="">All Roles</option>
+          <option value="worker">Worker</option>
+          <option value="supervisor">Supervisor</option>
+          <option value="manager">Manager</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label for="searchInput" class="form-label">Search</label>
+        <input type="text" class="form-control" id="searchInput" placeholder="Search workers...">
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        {% if session.role in ['admin','manager'] %}
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addLabourModal">
+          <i class="fas fa-plus"></i> Add Worker
+        </button>
+        {% endif %}
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-success" onclick="exportLabour()"> <i class="fas fa-download"></i> Export</button>
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-info" onclick="exportLabour()"> <i class="fas fa-print"></i> Print</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-container">
+    <div class="table-header">
+      <h5><i class="fas fa-users"></i> Workers</h5>
+      <span class="badge bg-primary" id="labourCount">0 workers</span>
+    </div>
+    <div id="labourTable">
+      <div class="text-center p-4">
+        <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Labour Modal -->
+<div class="modal fade" id="addLabourModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-plus"></i> Add / Edit Worker</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="addLabourForm">
+        <input type="hidden" id="editLabourId" value="">
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-4">
+              <label class="form-label">Farm *</label>
+              <select id="labourFarmSelect" class="form-select" required><option value="">Select Farm</option></select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">First Name *</label>
+              <input id="firstName" class="form-control" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Last Name *</label>
+              <input id="lastName" class="form-control" required>
+            </div>
+          </div>
+          <div class="row mt-3">
+            <div class="col-md-4">
+              <label class="form-label">Phone</label>
+              <input id="labourPhone" class="form-control">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Role</label>
+              <select id="labourRole" class="form-select">
+                <option value="worker">Worker</option>
+                <option value="supervisor">Supervisor</option>
+                <option value="manager">Manager</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Hired Date</label>
+              <input id="labourHiredDate" type="date" class="form-control">
+            </div>
+          </div>
+          <div class="mt-3">
+            <label class="form-label">Notes</label>
+            <textarea id="labourNotes" class="form-control" rows="3"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">Cancel</button>
+          <button class="btn btn-primary" type="submit"><i class="fas fa-save"></i> Save Worker</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Utility function to escape HTML to prevent XSS
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+let labourData = [];
+let farmsData = [];
+const userRole = "{{ session.role|default('') }}";
+
+document.addEventListener('DOMContentLoaded', function() {
+  loadFarms();
+  loadLabour();
+  setupLabourEvents();
+});
+
+function setupLabourEvents() {
+  document.getElementById('addLabourForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    saveLabour();
+  });
+  document.getElementById('farmFilter').addEventListener('change', filterLabour);
+  document.getElementById('roleFilter').addEventListener('change', filterLabour);
+  document.getElementById('searchInput').addEventListener('input', filterLabour);
+}
+
+function loadFarms() {
+  fetch('/api/farms').then(r=>r.json()).then(data=>{
+    farmsData = data;
+    populateFarmSelectsLabour();
+  }).catch(console.error);
+}
+
+function populateFarmSelectsLabour() {
+  const fFilter = document.getElementById('farmFilter');
+  const fSelect = document.getElementById('labourFarmSelect');
+  fFilter.innerHTML = '<option value="">All Farms</option>';
+  fSelect.innerHTML = '<option value="">Select Farm</option>';
+  farmsData.forEach(f=>{
+    const o1 = document.createElement('option'); o1.value = f.id; o1.textContent = f.name; fFilter.appendChild(o1);
+    const o2 = document.createElement('option'); o2.value = f.id; o2.textContent = f.name; fSelect.appendChild(o2);
+  });
+}
+
+function loadLabour() {
+  showLoading(document.getElementById('labourTable'));
+  fetch('/api/labour').then(r=>r.json()).then(data=>{
+    labourData = data;
+    displayLabour(data);
+    document.getElementById('labourCount').textContent = `${data.length} workers`;
+  }).catch(err=>{
+    console.error(err);
+    showError(document.getElementById('labourTable'),'Failed to load workers');
+  });
+}
+
+function displayLabour(list) {
+  const container = document.getElementById('labourTable');
+  
+  if (list.length === 0) {
+    container.innerHTML = '<div class="text-center p-4"><p>No workers found</p></div>';
+    return;
+  }
+
+  let html = `
+    <div class="table-responsive">
+      <table class="table table-striped table-hover table-sm">
+        <thead>
+          <tr>
+            <th width="20%">Name</th>
+            <th width="15%">Farm</th>
+            <th width="15%">Phone</th>
+            <th width="15%">Role</th>
+            <th width="15%">Hired Date</th>
+            <th width="20%">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  list.forEach(worker => {
+    const roleMap = {
+        'worker': { class: 'bg-primary', text: 'Worker', icon: 'fa-user' },
+        'supervisor': { class: 'bg-success', text: 'Supervisor', icon: 'fa-user-tie' },
+        'manager': { class: 'bg-warning', text: 'Manager', icon: 'fa-user-cog' },
+        'other': { class: 'bg-secondary', text: 'Other', icon: 'fa-user' }
+    };
+    const role = roleMap[worker.role] || { class: 'bg-secondary', text: worker.role, icon: 'fa-user' };
+
+    html += `
+      <tr>
+        <td><strong>${escapeHtml(worker.first_name || '')} ${escapeHtml(worker.last_name || '')}</strong></td>
+        <td><small>${escapeHtml(worker.farm_name || 'N/A')}</small></td>
+        <td><small>${escapeHtml(worker.phone || 'N/A')}</small></td>
+        <td>
+            <span class="badge ${role.class}">
+                <i class="fas ${role.icon} me-1"></i>${role.text}
+            </span>
+        </td>
+        <td><small>${worker.hired_date ? formatDateShort(worker.hired_date) : 'N/A'}</small></td>
+        <td>
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-primary" onclick="viewWorker(${worker.id})" title="View">
+              <i class="fas fa-eye"></i>
+            </button>
+    `;
+    
+    if (['admin','manager'].includes(userRole)) {
+      html += `
+            <button class="btn btn-outline-success" onclick="editWorker(${worker.id})" title="Edit">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" title="More">
+              <i class="fas fa-ellipsis-v"></i>
+            </button>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="#" onclick="assignTaskToWorker(${worker.id})">Assign Task</a></li>
+              <li><a class="dropdown-item" href="#" onclick="viewWorkerTasks(${worker.id})">View Tasks</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" href="#" onclick="deleteWorker(${worker.id})">Delete Worker</a></li>
+            </ul>
+      `;
+    }
+    
+    html += `
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+
+  html += `
+        </tbody>
+      </table>
+    </div>
+  `;
+  container.innerHTML = html;
+}
+
+function filterLabour() {
+  const farm = document.getElementById('farmFilter').value;
+  const role = document.getElementById('roleFilter').value;
+  const term = document.getElementById('searchInput').value.toLowerCase();
+  let filtered = labourData;
+  
+  if (farm) filtered = filtered.filter(r=>String(r.farm_id)===String(farm));
+  if (role) filtered = filtered.filter(r=>r.role===role);
+  if (term) filtered = filtered.filter(r=>{
+    return (r.first_name||'').toLowerCase().includes(term) || 
+           (r.last_name||'').toLowerCase().includes(term) || 
+           (r.phone||'').toLowerCase().includes(term) || 
+           (r.farm_name||'').toLowerCase().includes(term);
+  });
+  
+  displayLabour(filtered);
+  document.getElementById('labourCount').textContent = `${filtered.length} workers`;
+}
+
+function saveLabour() {
+  const editId = document.getElementById('editLabourId').value;
+  const payload = {
+    farm_id: parseInt(document.getElementById('labourFarmSelect').value),
+    first_name: document.getElementById('firstName').value,
+    last_name: document.getElementById('lastName').value,
+    phone: document.getElementById('labourPhone').value,
+    role: document.getElementById('labourRole').value,
+    hired_date: document.getElementById('labourHiredDate').value || null,
+    notes: document.getElementById('labourNotes').value
+  };
+  
+  const url = editId ? `/api/labour/${editId}` : '/api/labour';
+  const method = editId ? 'PUT' : 'POST';
+  
+  fetch(url, {
+    method, 
+    headers: {'Content-Type':'application/json'}, 
+    body: JSON.stringify(payload)
+  }).then(r=>r.json()).then(data=>{
+    if (data.error) throw new Error(data.error);
+    showSuccess(editId ? 'Worker updated successfully' : 'Worker added successfully');
+    bootstrap.Modal.getInstance(document.getElementById('addLabourModal')).hide();
+    document.getElementById('addLabourForm').reset();
+    document.getElementById('editLabourId').value = '';
+    loadLabour();
+  }).catch(err=>{
+    console.error(err);
+    showError('Failed to save worker: ' + err.message);
+  });
+}
+
+function viewWorker(id) {
+  const worker = labourData.find(x=>x.id===id);
+  if (!worker) {
+    fetch(`/api/labour/${id}`)
+      .then(r=>r.json())
+      .then(openWorkerView)
+      .catch(console.error);
+  } else {
+    openWorkerView(worker);
+  }
+}
+
+function openWorkerView(worker) {
+  const modalHtml = `
+    <div class="modal fade" id="viewWorkerModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Worker Details</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p><strong>Name:</strong> ${worker.first_name} ${worker.last_name}</p>
+            <p><strong>Farm:</strong> ${worker.farm_name || 'N/A'}</p>
+            <p><strong>Phone:</strong> ${worker.phone || 'N/A'}</p>
+            <p><strong>Role:</strong> ${worker.role ? worker.role.charAt(0).toUpperCase() + worker.role.slice(1) : 'N/A'}</p>
+            <p><strong>Hired Date:</strong> ${worker.hired_date ? formatDate(worker.hired_date) : 'N/A'}</p>
+            ${worker.notes ? `<p><strong>Notes:</strong> ${worker.notes}</p>` : ''}
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Remove existing modal if any
+  const existingModal = document.getElementById('viewWorkerModal');
+  if (existingModal) existingModal.remove();
+  
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+  const modal = new bootstrap.Modal(document.getElementById('viewWorkerModal'));
+  modal.show();
+}
+
+function editWorker(id) {
+  const worker = labourData.find(x=>x.id===id);
+  if (!worker) {
+    fetch(`/api/labour/${id}`)
+      .then(r=>r.json())
+      .then(openLabourModalForEdit)
+      .catch(console.error);
+  } else {
+    openLabourModalForEdit(worker);
+  }
+}
+
+function openLabourModalForEdit(worker) {
+  document.getElementById('editLabourId').value = worker.id;
+  document.getElementById('labourFarmSelect').value = worker.farm_id || '';
+  document.getElementById('firstName').value = worker.first_name || '';
+  document.getElementById('lastName').value = worker.last_name || '';
+  document.getElementById('labourPhone').value = worker.phone || '';
+  document.getElementById('labourRole').value = worker.role || 'worker';
+  document.getElementById('labourHiredDate').value = worker.hired_date || '';
+  document.getElementById('labourNotes').value = worker.notes || '';
+  
+  const modal = new bootstrap.Modal(document.getElementById('addLabourModal'));
+  modal.show();
+}
+
+function exportLabour() {
+  if (labourData.length === 0) {
+    showError('No workers to export');
+    return;
+  }
+  
+  const headers = ['Name', 'Farm', 'Phone', 'Role', 'Hired Date', 'Notes'];
+  const csvData = labourData.map(worker => [
+    `${worker.first_name} ${worker.last_name}`,
+    worker.farm_name || '',
+    worker.phone || '',
+    worker.role || '',
+    worker.hired_date || '',
+    worker.notes || ''
+  ]);
+  
+  exportToCSV(csvData, headers, 'labour_export.csv');
+}
+
+function deleteWorker(id) {
+  if (!confirm('Are you sure you want to delete this worker?')) return;
+  
+  fetch(`/api/labour/${id}`, { method: 'DELETE' })
+    .then(response => response.json())
+    .then(data => {
+      if (data.error) throw new Error(data.error);
+      showSuccess('Worker deleted successfully');
+      loadLabour();
+    })
+    .catch(error => {
+      console.error('Error deleting worker:', error);
+      showError('Failed to delete worker: ' + error.message);
+    });
+}
+
+function assignTaskToWorker(workerId) {
+  const worker = labourData.find(w => w.id === workerId);
+  const taskTitle = prompt(`Enter task title for ${worker.first_name}:`);
+  
+  if (taskTitle) {
+    fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: taskTitle,
+        assigned_to: workerId,
+        status: 'todo',
+        priority: 'medium'
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      showSuccess('Task assigned successfully');
+    })
+    .catch(error => {
+      console.error('Error assigning task:', error);
+      showError('Failed to assign task');
+    });
+  }
+}
+
+function viewWorkerTasks(workerId) {
+  fetch(`/api/tasks?assigned_to=${workerId}`)
+    .then(response => response.json())
+    .then(tasks => {
+      if (tasks.length === 0) {
+        alert('No tasks assigned to this worker');
+        return;
+      }
+      
+      const taskList = tasks.map(task => 
+        `• ${task.title} (${task.status})`
+      ).join('\n');
+      
+      alert(`Worker's Tasks:\n${taskList}`);
+    })
+    .catch(error => {
+      console.error('Error loading worker tasks:', error);
+      showError('Failed to load worker tasks');
+    });
+}
+
+</script>
+{% endblock %}

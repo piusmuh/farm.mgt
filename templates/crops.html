@@ -1,0 +1,588 @@
+{% extends "base.html" %}
+
+{% block title %}Crops - Farm Management System{% endblock %}
+{% block page_title %}Crop Management{% endblock %}
+
+{% block content %}
+<div class="crops-container">
+    <!-- Filter Controls -->
+    <div class="filter-controls">
+        <div class="row w-100">
+            <div class="col-md-2">
+                <label for="farmFilter" class="form-label">Farm</label>
+                <select class="form-select" id="farmFilter">
+                    <option value="">All Farms</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="statusFilter" class="form-label">Status</label>
+                <select class="form-select" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="planted">Planted</option>
+                    <option value="growing">Growing</option>
+                    <option value="ready_harvest">Ready</option>
+                    <option value="harvested">Harvested</option>
+                    <option value="failed">Failed</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="cropFilter" class="form-label">Crop Type</label>
+                <select class="form-select" id="cropFilter">
+                    <option value="">All Crops</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="searchInput" class="form-label">Search</label>
+                <input type="text" class="form-control" id="searchInput" placeholder="Search crops...">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                {% if session.role in ['admin','manager'] %}
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCropModal">
+                    <i class="fas fa-plus"></i> Add Crop
+                </button>
+                {% endif %}
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-success" onclick="exportCrops()">
+                    <i class="fas fa-download"></i> Export
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    
+    
+
+    <!-- Crops Table -->
+    <div class="table-container">
+        <div class="table-header">
+            <h5><i class="fas fa-leaf"></i> Crops</h5>
+            <span class="badge bg-primary" id="cropCount">0 crops</span>
+        </div>
+        <div id="cropsTable">
+            <div class="text-center p-4">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Crop Modal -->
+<div class="modal fade" id="addCropModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-plus"></i> Add New Crop</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addCropForm">
+                <input type="hidden" id="editCropId" value="">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="farmSelect" class="form-label">Farm *</label>
+                                <select class="form-select" id="farmSelect" required>
+                                    <option value="">Select Farm</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="cropName" class="form-label">Crop Name *</label>
+                                <input type="text" class="form-control" id="cropName" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="variety" class="form-label">Variety</label>
+                                <input type="text" class="form-control" id="variety">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="areaAcres" class="form-label">Area (Acres) *</label>
+                                <input type="number" class="form-control" id="areaAcres" step="0.01" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="plantingDate" class="form-label">Planting Date</label>
+                                <input type="date" class="form-control" id="plantingDate">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="harvestDate" class="form-label">Expected Harvest Date</label>
+                                <input type="date" class="form-control" id="harvestDate">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="expectedYield" class="form-label">Expected Yield</label>
+                                <input type="number" class="form-control" id="expectedYield" step="0.01">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="status" class="form-label">Status</label>
+                                <select class="form-select" id="status">
+                                    <option value="planted">Planted</option>
+                                    <option value="growing">Growing</option>
+                                    <option value="ready_harvest">Ready to Harvest</option>
+                                    <option value="harvested">Harvested</option>
+                                    <option value="failed">Failed</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="notes" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="resetCropForm()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Crop
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Utility function to escape HTML to prevent XSS
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+let cropsData = [];
+let farmsData = [];
+// server-side role (for hiding edit controls). Provided by Jinja.
+const userRole = "{{ session.role|default('') }}";
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadFarms();
+    loadCrops();
+    setupEventListeners();
+});
+
+function setupEventListeners() {
+    // Add crop form submission (used for both add & edit)
+    document.getElementById('addCropForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveCrop();
+    });
+    
+    // Filter controls
+    document.getElementById('farmFilter').addEventListener('change', filterCrops);
+    document.getElementById('statusFilter').addEventListener('change', filterCrops);
+    document.getElementById('cropFilter').addEventListener('change', filterCrops);
+    document.getElementById('searchInput').addEventListener('input', filterCrops);
+}
+
+function loadFarms() {
+    fetch('/api/farms')
+        .then(response => response.json())
+        .then(data => {
+            farmsData = data;
+            populateFarmSelects();
+        })
+        .catch(error => {
+            console.error('Error loading farms:', error);
+        });
+}
+
+function populateFarmSelects() {
+    const farmFilter = document.getElementById('farmFilter');
+    const farmSelect = document.getElementById('farmSelect');
+    // clear first
+    farmFilter.innerHTML = '<option value="">All Farms</option>';
+    farmSelect.innerHTML = '<option value="">Select Farm</option>';
+    
+    farmsData.forEach(farm => {
+        const option1 = document.createElement('option');
+        option1.value = farm.id;
+        option1.textContent = farm.name;
+        farmFilter.appendChild(option1);
+        
+        const option2 = document.createElement('option');
+        option2.value = farm.id;
+        option2.textContent = farm.name;
+        farmSelect.appendChild(option2);
+    });
+}
+
+function loadCrops() {
+    showLoading(document.getElementById('cropsTable'));
+    
+    fetch('/api/crops')
+        .then(response => {
+            if (!response.ok) throw new Error('HTTP error ' + response.status);
+            return response.json();
+        })
+        .then(data => {
+            cropsData = data;
+            displayCrops(data);
+            updateCropCount(data.length);
+            populateCropTypes();
+        })
+        .catch(error => {
+            console.error('Error loading crops:', error);
+            showError(document.getElementById('cropsTable'), 'Failed to load crops data. Please check if the server is running.');
+        });
+}
+
+function populateCropTypes() {
+    const cropFilter = document.getElementById('cropFilter');
+    cropFilter.innerHTML = '<option value="">All Crops</option>';
+    const uniqueCrops = [...new Set(cropsData.map(crop => crop.crop_name || ''))].filter(Boolean);
+    
+    uniqueCrops.forEach(cropName => {
+        const option = document.createElement('option');
+        option.value = cropName;
+        option.textContent = cropName;
+        cropFilter.appendChild(option);
+    });
+}
+
+function displayCrops(crops) {
+    const container = document.getElementById('cropsTable');
+    
+    if (crops.length === 0) {
+        container.innerHTML = '<div class="text-center p-4"><p>No crops found</p></div>';
+        return;
+    }
+
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-striped table-hover table-sm">
+                <thead>
+                    <tr>
+                        <th width="12%">Crop</th>
+                        <th width="10%">Variety</th>
+                        <th width="12%">Farm</th>
+                        <th width="8%">Area</th>
+                        <th width="15%">Status</th>
+                        <th width="10%">Planted</th>
+                        <th width="10%">Harvest</th>
+                        <th width="8%">Yield</th>
+                        <th width="15%">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    crops.forEach(crop => {
+        const statusMap = {
+            'planted': { class: 'bg-info', text: 'Planted', icon: 'fa-seedling' },
+            'growing': { class: 'bg-primary', text: 'Growing', icon: 'fa-leaf' },
+            'ready_harvest': { class: 'bg-warning', text: 'Ready', icon: 'fa-check-circle' },
+            'harvested': { class: 'bg-success', text: 'Harvested', icon: 'fa-check' },
+            'failed': { class: 'bg-danger', text: 'Failed', icon: 'fa-times' }
+        };
+        const status = statusMap[crop.status] || { class: 'bg-secondary', text: crop.status, icon: 'fa-question' };
+
+        html += `
+            <tr>
+                <td><strong>${escapeHtml(crop.crop_name || 'N/A')}</strong></td>
+                <td><small>${escapeHtml(crop.variety || '-')}</small></td>
+                <td><small>${escapeHtml(crop.farm_name || 'N/A')}</small></td>
+                <td><span class="badge bg-light text-dark">${formatNumber(crop.area_acres, 1)} ac</span></td>
+                <td>
+                    <span class="badge ${status.class}">
+                        <i class="fas ${status.icon} me-1"></i>${status.text}
+                    </span>
+                </td>
+                <td><small>${crop.planting_date ? formatDateShort(crop.planting_date) : '-'}</small></td>
+                <td><small>${crop.harvest_date ? formatDateShort(crop.harvest_date) : '-'}</small></td>
+                <td><small>${crop.expected_yield ? formatNumber(crop.expected_yield, 1) : '-'}</small></td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary" onclick="viewCrop(${crop.id})" title="View">
+                            <i class="fas fa-eye"></i>
+                        </button>
+        `;
+        
+        if (['admin','manager'].includes(userRole)) {
+            html += `
+                        <button class="btn btn-outline-success" onclick="editCrop(${crop.id})" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" title="More">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="updateCropStatus(${crop.id}, 'growing')">Mark Growing</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="updateCropStatus(${crop.id}, 'ready_harvest')">Mark Ready</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="updateCropStatus(${crop.id}, 'harvested')">Mark Harvested</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteCrop(${crop.id})">Delete</a></li>
+                        </ul>
+            `;
+        }
+        
+        html += `
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
+}
+
+function filterCrops() {
+    const farmFilter = document.getElementById('farmFilter').value;
+    const statusFilter = document.getElementById('statusFilter').value;
+    const cropFilter = document.getElementById('cropFilter').value;
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    
+    let filteredCrops = cropsData;
+    
+    if (farmFilter) {
+        filteredCrops = filteredCrops.filter(crop => String(crop.farm_id) === String(farmFilter));
+    }
+    
+    if (statusFilter) {
+        filteredCrops = filteredCrops.filter(crop => crop.status === statusFilter);
+    }
+    
+    if (cropFilter) {
+        filteredCrops = filteredCrops.filter(crop => crop.crop_name === cropFilter);
+    }
+    
+    if (searchTerm) {
+        filteredCrops = filteredCrops.filter(crop => 
+            (crop.crop_name || '').toLowerCase().includes(searchTerm) ||
+            (crop.variety || '').toLowerCase().includes(searchTerm) ||
+            (crop.farm_name || '').toLowerCase().includes(searchTerm)
+        );
+    }
+    
+    displayCrops(filteredCrops);
+    updateCropCount(filteredCrops.length);
+}
+
+function updateCropCount(count) {
+    document.getElementById('cropCount').textContent = `${count} crops`;
+}
+
+// Save crop (handles both add and edit) - IMPROVED VERSION
+function saveCrop() {
+    const editId = document.getElementById('editCropId').value;
+    const payload = {
+        farm_id: parseInt(document.getElementById('farmSelect').value),
+        crop_name: document.getElementById('cropName').value,
+        variety: document.getElementById('variety').value,
+        area_acres: parseFloat(document.getElementById('areaAcres').value),
+        planting_date: document.getElementById('plantingDate').value || null,
+        harvest_date: document.getElementById('harvestDate').value || null,
+        expected_yield: document.getElementById('expectedYield').value ? parseFloat(document.getElementById('expectedYield').value) : null,
+        status: document.getElementById('status').value,
+        notes: document.getElementById('notes').value
+    };
+
+    // Validate required fields
+    if (!payload.farm_id || !payload.crop_name || !payload.area_acres) {
+        showError(document.body, 'Please fill in all required fields');
+        return;
+    }
+
+    const url = editId ? `/api/crops/${editId}` : '/api/crops';
+    const method = editId ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => { throw new Error(data.error || 'Save failed'); });
+        }
+        return response.json();
+    })
+    .then(data => {
+        showSuccess(editId ? 'Crop updated successfully' : 'Crop added successfully');
+        hideModal('addCropModal');
+        resetCropForm();
+        loadCrops();
+    })
+    .catch(err => {
+        console.error('Error saving crop:', err);
+        showError(document.body, 'Failed to save crop: ' + err.message);
+    });
+}
+
+function viewCrop(id) {
+    const crop = cropsData.find(c => c.id === id);
+    if (crop) {
+        alert(`Crop: ${crop.crop_name}\nVariety: ${crop.variety}\nFarm: ${crop.farm_name}\nArea: ${crop.area_acres} acres\nStatus: ${crop.status}`);
+    }
+}
+
+function editCrop(id) {
+    const crop = cropsData.find(c => c.id === id);
+    if (!crop) {
+        // fallback: fetch single crop
+        fetch(`/api/crops/${id}`)
+            .then(r => r.json())
+            .then(cropData => {
+                openCropModalForEdit(cropData);
+            })
+            .catch(err => {
+                console.error('Failed to fetch crop for edit:', err);
+            });
+        return;
+    }
+    openCropModalForEdit(crop);
+}
+
+function openCropModalForEdit(crop) {
+    // populate modal fields
+    document.getElementById('editCropId').value = crop.id;
+    document.getElementById('farmSelect').value = crop.farm_id || '';
+    document.getElementById('cropName').value = crop.crop_name || '';
+    document.getElementById('variety').value = crop.variety || '';
+    document.getElementById('areaAcres').value = crop.area_acres || '';
+    document.getElementById('plantingDate').value = crop.planting_date || '';
+    document.getElementById('harvestDate').value = crop.harvest_date || '';
+    document.getElementById('expectedYield').value = crop.expected_yield || '';
+    document.getElementById('status').value = crop.status || 'planted';
+    document.getElementById('notes').value = crop.notes || '';
+    // show modal
+    showModal('addCropModal');
+}
+
+function exportCrops() {
+    if (cropsData.length === 0) {
+        showError(document.body, 'No crops to export');
+        return;
+    }
+    
+    exportToCSV(cropsData, 'crops_export.csv');
+}
+
+// Update crop status from dropdown
+function updateCropStatus(cropId, newStatus) {
+    // First get the current crop data
+    const crop = cropsData.find(c => c.id === cropId);
+    if (!crop) {
+        showError(document.body, 'Crop not found in current data');
+        return;
+    }
+
+    // Create payload with all required fields
+    const payload = {
+        farm_id: crop.farm_id,
+        crop_name: crop.crop_name,
+        variety: crop.variety || '',
+        area_acres: crop.area_acres,
+        planting_date: crop.planting_date || null,
+        harvest_date: crop.harvest_date || null,
+        expected_yield: crop.expected_yield || null,
+        status: newStatus, // This is what we're updating
+        notes: crop.notes || ''
+    };
+
+    fetch(`/api/crops/${cropId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => { throw new Error(data.error || 'Update failed'); });
+        }
+        return response.json();
+    })
+    .then(data => {
+        showSuccess('Crop status updated successfully');
+        loadCrops(); // Refresh the data
+    })
+    .catch(error => {
+        console.error('Error updating crop status:', error);
+        showError(document.body, 'Failed to update crop status: ' + error.message);
+    });
+}
+
+// Delete crop function
+function deleteCrop(id) {
+    if (!confirm('Are you sure you want to delete this crop? This action cannot be undone.')) {
+        return;
+    }
+
+    fetch(`/api/crops/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => { throw new Error(data.error || 'Delete failed'); });
+        }
+        return response.json();
+    })
+    .then(data => {
+        showSuccess('Crop deleted successfully');
+        loadCrops(); // Refresh the list
+    })
+    .catch(error => {
+        console.error('Error deleting crop:', error);
+        showError(document.body, 'Failed to delete crop: ' + error.message);
+    });
+}
+
+function resetCropForm() {
+    document.getElementById('addCropForm').reset();
+    document.getElementById('editCropId').value = '';
+}
+
+function escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function createStatusBadge(status) {
+    const statusMap = {
+        'active': 'bg-success',
+        'inactive': 'bg-secondary',
+        'sold': 'bg-warning',
+        'planted': 'bg-info',
+        'growing': 'bg-primary',
+        'ready_harvest': 'bg-warning',
+        'harvested': 'bg-success',
+        'failed': 'bg-danger'
+    };
+    const badgeClass = statusMap[status] || 'bg-secondary';
+    return `<span class="badge ${badgeClass}">${status}</span>`;
+}
+</script>
+{% endblock %}

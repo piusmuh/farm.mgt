@@ -1,0 +1,511 @@
+{% extends "base.html" %}
+
+{% block title %}Equipment - Farm Management System{% endblock %}
+{% block page_title %}Equipment Management{% endblock %}
+
+{% block content %}
+<div class="equipment-container">
+    <!-- Filter Controls -->
+    <div class="filter-controls">
+        <div class="row w-100">
+            <div class="col-md-2">
+                <label for="farmFilter" class="form-label">Farm</label>
+                <select class="form-select" id="farmFilter">
+                    <option value="">All Farms</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="conditionFilter" class="form-label">Condition</label>
+                <select class="form-select" id="conditionFilter">
+                    <option value="">All Conditions</option>
+                    <option value="excellent">Excellent</option>
+                    <option value="good">Good</option>
+                    <option value="fair">Fair</option>
+                    <option value="poor">Poor</option>
+                    <option value="broken">Broken</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="searchInput" class="form-label">Search</label>
+                <input type="text" class="form-control" id="searchInput" placeholder="Search equipment...">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                {% if session.role in ['admin','manager'] %}
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#equipmentModal" onclick="openAddModal()">
+                    <i class="fas fa-plus"></i> Add Equipment
+                </button>
+                {% endif %}
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-success" onclick="exportEquipment()">
+                    <i class="fas fa-download"></i> Export
+                </button>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-info" onclick="exportEquipment()">
+                    <i class="fas fa-print"></i> Print
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Equipment Table -->
+    <div class="table-container">
+        <div class="table-header">
+            <h5><i class="fas fa-tractor"></i> Equipment</h5>
+            <span class="badge bg-primary" id="equipmentCount">0 items</span>
+        </div>
+        <div id="equipmentTable">
+            <div class="text-center p-4">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Equipment Modal (Add / Edit) -->
+<div class="modal fade" id="equipmentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="equipmentModalTitle"><i class="fas fa-plus"></i> Add Equipment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="equipmentForm">
+                <input type="hidden" id="editEquipmentId" value="">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="equipmentName" class="form-label">Equipment Name *</label>
+                                <input type="text" class="form-control" id="equipmentName" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="farmId" class="form-label">Farm *</label>
+                                <select class="form-select" id="farmId" required>
+                                    <option value="">Select farm...</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="equipmentType" class="form-label">Type</label>
+                                <input type="text" class="form-control" id="equipmentType" placeholder="e.g. Tractor">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="brand" class="form-label">Brand</label>
+                                <input type="text" class="form-control" id="brand">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="model" class="form-label">Model</label>
+                                <input type="text" class="form-control" id="model">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="purchaseDate" class="form-label">Purchase Date</label>
+                                <input type="date" class="form-control" id="purchaseDate">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="purchasePrice" class="form-label">Purchase Price (UGX)</label>
+                                <input type="number" class="form-control" id="purchasePrice" step="0.01" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="conditionStatus" class="form-label">Condition</label>
+                                <select class="form-select" id="conditionStatus">
+                                    <option value="excellent">Excellent</option>
+                                    <option value="good" selected>Good</option>
+                                    <option value="fair">Fair</option>
+                                    <option value="poor">Poor</option>
+                                    <option value="broken">Broken</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="maintenanceDue" class="form-label">Next Maintenance Due</label>
+                                <input type="date" class="form-control" id="maintenanceDue">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="notes" class="form-label">Notes</label>
+                                <textarea class="form-control" id="notes" rows="2"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Equipment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Utility function to escape HTML to prevent XSS
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+let equipmentData = [];
+let farmsData = [];
+const userRole = "{{ session.role|default('') }}";
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadFarms();
+    loadEquipment();
+    setupEventListeners();
+});
+
+function setupEventListeners() {
+    document.getElementById('equipmentForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveEquipment();
+    });
+    document.getElementById('farmFilter').addEventListener('change', filterEquipment);
+    document.getElementById('conditionFilter').addEventListener('change', filterEquipment);
+    document.getElementById('searchInput').addEventListener('input', filterEquipment);
+}
+
+function loadFarms() {
+    fetch('/api/farms')
+        .then(response => response.json())
+        .then(data => {
+            farmsData = data;
+            const farmFilter = document.getElementById('farmFilter');
+            const farmSelect = document.getElementById('farmId');
+            data.forEach(farm => {
+                farmFilter.insertAdjacentHTML('beforeend',
+                    `<option value="${farm.id}">${farm.name}</option>`);
+                farmSelect.insertAdjacentHTML('beforeend',
+                    `<option value="${farm.id}">${farm.name}</option>`);
+            });
+        })
+        .catch(error => console.error('Error loading farms:', error));
+}
+
+function loadEquipment() {
+    showLoading(document.getElementById('equipmentTable'));
+
+    fetch('/api/equipment')
+        .then(response => {
+            if (!response.ok) throw new Error('HTTP error ' + response.status);
+            return response.json();
+        })
+        .then(data => {
+            equipmentData = data;
+            displayEquipment(data);
+            updateEquipmentCount(data.length);
+        })
+        .catch(error => {
+            console.error('Error loading equipment:', error);
+            showError(document.getElementById('equipmentTable'), 'Failed to load equipment data.');
+        });
+}
+
+function displayEquipment(items) {
+    const container = document.getElementById('equipmentTable');
+    
+    if (items.length === 0) {
+        container.innerHTML = '<div class="text-center p-4"><p>No equipment found</p></div>';
+        return;
+    }
+
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-striped table-hover table-sm">
+                <thead>
+                    <tr>
+                        <th width="15%">Name</th>
+                        <th width="12%">Type</th>
+                        <th width="15%">Brand / Model</th>
+                        <th width="12%">Farm</th>
+                        <th width="12%">Condition</th>
+                        <th width="12%">Purchase Price</th>
+                        <th width="10%">Maintenance Due</th>
+                        <th width="12%">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    items.forEach(equipment => {
+        const brandModel = `${equipment.brand || ''} ${equipment.model || ''}`.trim() || 'N/A';
+        const conditionMap = {
+            'excellent': { class: 'bg-success', text: 'Excellent', icon: 'fa-star' },
+            'good': { class: 'bg-primary', text: 'Good', icon: 'fa-thumbs-up' },
+            'fair': { class: 'bg-warning', text: 'Fair', icon: 'fa-minus' },
+            'poor': { class: 'bg-danger', text: 'Poor', icon: 'fa-thumbs-down' },
+            'broken': { class: 'bg-dark', text: 'Broken', icon: 'fa-times' }
+        };
+        const condition = conditionMap[equipment.condition_status] || { class: 'bg-secondary', text: equipment.condition_status, icon: 'fa-question' };
+
+        html += `
+            <tr>
+                <td><strong>${escapeHtml(equipment.equipment_name || 'N/A')}</strong></td>
+                <td><small>${escapeHtml(equipment.equipment_type || '-')}</small></td>
+                <td><small>${escapeHtml(brandModel)}</small></td>
+                <td><small>${escapeHtml(equipment.farm_name || 'N/A')}</small></td>
+                <td>
+                    <span class="badge ${condition.class}">
+                        <i class="fas ${condition.icon} me-1"></i>${condition.text}
+                    </span>
+                </td>
+                <td><small>${equipment.purchase_price ? formatCurrency(equipment.purchase_price) : '-'}</small></td>
+                <td><small>${equipment.maintenance_due ? formatDateShort(equipment.maintenance_due) : '-'}</small></td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary" onclick="viewEquipment(${equipment.id})" title="View">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        ${['admin','manager'].includes(userRole) ? `
+                        <button class="btn btn-outline-success" onclick="editEquipment(${equipment.id})" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" title="More">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="updateCondition(${equipment.id}, 'excellent')">Mark Excellent</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="updateCondition(${equipment.id}, 'good')">Mark Good</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="updateCondition(${equipment.id}, 'fair')">Mark Fair</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="updateCondition(${equipment.id}, 'poor')">Mark Poor</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="updateCondition(${equipment.id}, 'broken')">Mark Broken</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteEquipment(${equipment.id})">Delete</a></li>
+                        </ul>
+                        ` : ''}
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+function filterEquipment() {
+    const farmFilter = document.getElementById('farmFilter').value;
+    const conditionFilter = document.getElementById('conditionFilter').value;
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+
+    let filtered = equipmentData;
+
+    if (farmFilter) {
+        filtered = filtered.filter(item => String(item.farm_id) === farmFilter);
+    }
+    if (conditionFilter) {
+        filtered = filtered.filter(item => item.condition_status === conditionFilter);
+    }
+    if (searchTerm) {
+        filtered = filtered.filter(item =>
+            (item.equipment_name || '').toLowerCase().includes(searchTerm) ||
+            (item.equipment_type || '').toLowerCase().includes(searchTerm) ||
+            (item.brand || '').toLowerCase().includes(searchTerm) ||
+            (item.model || '').toLowerCase().includes(searchTerm)
+        );
+    }
+
+    displayEquipment(filtered);
+    updateEquipmentCount(filtered.length);
+}
+
+function updateEquipmentCount(count) {
+    document.getElementById('equipmentCount').textContent = `${count} item${count !== 1 ? 's' : ''}`;
+}
+
+function openAddModal() {
+    document.getElementById('equipmentModalTitle').innerHTML = '<i class="fas fa-plus"></i> Add Equipment';
+    document.getElementById('equipmentForm').reset();
+    document.getElementById('editEquipmentId').value = '';
+}
+
+function saveEquipment() {
+    const editId = document.getElementById('editEquipmentId').value;
+    const payload = {
+        farm_id: document.getElementById('farmId').value,
+        equipment_name: document.getElementById('equipmentName').value,
+        equipment_type: document.getElementById('equipmentType').value,
+        brand: document.getElementById('brand').value,
+        model: document.getElementById('model').value,
+        purchase_date: document.getElementById('purchaseDate').value || null,
+        purchase_price: document.getElementById('purchasePrice').value || null,
+        condition_status: document.getElementById('conditionStatus').value,
+        maintenance_due: document.getElementById('maintenanceDue').value || null,
+        notes: document.getElementById('notes').value
+    };
+
+    if (!payload.farm_id || !payload.equipment_name) {
+        showError(document.body, 'Please fill in all required fields');
+        return;
+    }
+
+    const url = editId ? `/api/equipment/${editId}` : '/api/equipment';
+    const method = editId ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => { throw new Error(data.error || 'Save failed'); });
+        }
+        return response.json();
+    })
+    .then(data => {
+        showSuccess(editId ? 'Equipment updated successfully' : 'Equipment added successfully');
+        hideModal('equipmentModal');
+        loadEquipment();
+    })
+    .catch(err => {
+        console.error('Error saving equipment:', err);
+        showError(document.body, 'Failed to save equipment: ' + err.message);
+    });
+}
+
+function viewEquipment(id) {
+    const item = equipmentData.find(e => e.id === id);
+    if (item) {
+        alert(`Equipment: ${item.equipment_name}\nType: ${item.equipment_type || 'N/A'}\nBrand: ${item.brand || 'N/A'} ${item.model || ''}\nFarm: ${item.farm_name}\nCondition: ${item.condition_status}\nPurchase Price: ${item.purchase_price ? formatCurrency(item.purchase_price) : 'N/A'}\nMaintenance Due: ${item.maintenance_due ? formatDate(item.maintenance_due) : 'N/A'}`);
+    }
+}
+
+function editEquipment(id) {
+    const item = equipmentData.find(e => e.id === id);
+    if (!item) {
+        fetch(`/api/equipment/${id}`)
+            .then(r => r.json())
+            .then(openModalForEdit)
+            .catch(err => console.error('Failed to fetch equipment:', err));
+        return;
+    }
+    openModalForEdit(item);
+}
+
+function openModalForEdit(item) {
+    document.getElementById('equipmentModalTitle').innerHTML = '<i class="fas fa-edit"></i> Edit Equipment';
+    document.getElementById('editEquipmentId').value = item.id;
+    document.getElementById('farmId').value = item.farm_id;
+    document.getElementById('equipmentName').value = item.equipment_name || '';
+    document.getElementById('equipmentType').value = item.equipment_type || '';
+    document.getElementById('brand').value = item.brand || '';
+    document.getElementById('model').value = item.model || '';
+    document.getElementById('purchaseDate').value = item.purchase_date || '';
+    document.getElementById('purchasePrice').value = item.purchase_price || '';
+    document.getElementById('conditionStatus').value = item.condition_status || 'good';
+    document.getElementById('maintenanceDue').value = item.maintenance_due || '';
+    document.getElementById('notes').value = item.notes || '';
+    showModal('equipmentModal');
+}
+
+function updateCondition(id, newCondition) {
+    const item = equipmentData.find(e => e.id === id);
+    if (!item) {
+        showError(document.body, 'Equipment not found');
+        return;
+    }
+
+    const payload = {
+        farm_id: item.farm_id,
+        equipment_name: item.equipment_name,
+        equipment_type: item.equipment_type || '',
+        brand: item.brand || '',
+        model: item.model || '',
+        purchase_date: item.purchase_date || null,
+        purchase_price: item.purchase_price || null,
+        condition_status: newCondition,
+        maintenance_due: item.maintenance_due || null,
+        notes: item.notes || ''
+    };
+
+    fetch(`/api/equipment/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => { throw new Error(data.error || 'Update failed'); });
+        }
+        return response.json();
+    })
+    .then(data => {
+        showSuccess(`Equipment marked as ${newCondition} successfully`);
+        loadEquipment();
+    })
+    .catch(error => {
+        console.error('Error updating equipment condition:', error);
+        showError(document.body, 'Failed to update equipment condition: ' + error.message);
+    });
+}
+
+function deleteEquipment(id) {
+    if (!confirm('Are you sure you want to delete this equipment? This action cannot be undone.')) {
+        return;
+    }
+
+    fetch(`/api/equipment/${id}`, { method: 'DELETE' })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => { throw new Error(data.error || 'Delete failed'); });
+            }
+            return response.json();
+        })
+        .then(data => {
+            showSuccess('Equipment deleted successfully');
+            loadEquipment();
+        })
+        .catch(error => {
+            console.error('Error deleting equipment:', error);
+            showError(document.body, 'Failed to delete equipment: ' + error.message);
+        });
+}
+
+function exportEquipment() {
+    if (equipmentData.length === 0) {
+        showError(document.body, 'No equipment to export');
+        return;
+    }
+    exportToCSV(equipmentData, 'equipment_export.csv');
+}
+</script>
+{% endblock %}

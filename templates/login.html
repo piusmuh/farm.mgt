@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Farm Management System{% endblock %}
+
+{% block login_content %}
+<div class="login-form-container">
+    <div class="login-form">
+        <div class="login-header">
+            <i class="fas fa-seedling"></i>
+            <h2>Farm Management System</h2>
+            <p>Please sign in to continue</p>
+        </div>
+        
+        {% if error %}
+        <div class="alert alert-danger" role="alert">
+            {{ error }}
+        </div>
+        {% endif %}
+        
+        <form method="POST">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" class="form-control" id="username" name="username" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" class="form-control" id="password" name="password" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-login">
+                <i class="fas fa-sign-in-alt"></i> Sign In
+            </button>
+        </form>
+        
+        <div class="login-footer">
+            <p><strong>Demo Credentials:</strong></p>
+            <p>Admin: admin / password</p>
+            <p>Manager: manager / password</p>
+            <p>Worker: worker / password</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
